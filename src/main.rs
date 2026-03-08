@@ -31,6 +31,13 @@ enum Commands {
     /// 問題名 (例: `a`, `b`, `abc123_a`)
     problem_name: String,
   },
+  /// コンテストの問題ページをブラウザで開く
+  Open {
+    /// コンテスト名 (例: `abs`, `abc123`)
+    contest_name: String,
+    /// 問題名 (例: `a`, `b`). 省略時は問題一覧ページを開く
+    problem_name: Option<String>,
+  },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,6 +60,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       problem_name,
     } => {
       cmd_test(&contest_name, &problem_name)?;
+    },
+    Commands::Open {
+      contest_name,
+      problem_name,
+    } => {
+      cmd_open(&contest_name, problem_name.as_deref())?;
     },
   }
 
@@ -190,7 +203,8 @@ fn extract_io_examples(html_text: &str) -> Vec<TestCase> {
 fn cmd_test(contest_name: &str, problem_name: &str) -> Result<(), Box<dyn std::error::Error>> {
   // まずビルドする
   println!("【ビルド中】{contest_name}/{problem_name}");
-  let build_status = Command::new("cargo").args(["build", "--bin", problem_name]).status()?;
+  let build_status =
+    Command::new("cargo").args(["build", "--package", contest_name, "--bin", problem_name]).status()?;
   if !build_status.success() {
     eprintln!("【ビルド失敗】");
     std::process::exit(1);
@@ -234,6 +248,18 @@ fn cmd_test(contest_name: &str, problem_name: &str) -> Result<(), Box<dyn std::e
   if passed < total {
     std::process::exit(1);
   }
+
+  Ok(())
+}
+
+fn cmd_open(contest_name: &str, problem_name: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+  let url = match problem_name {
+    Some(name) => format!("https://atcoder.jp/contests/{contest_name}/tasks/{name}"),
+    None => format!("https://atcoder.jp/contests/{contest_name}/tasks"),
+  };
+
+  println!("【オープン】{url}");
+  Command::new("open").arg(&url).status()?;
 
   Ok(())
 }
