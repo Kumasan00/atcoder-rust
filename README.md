@@ -6,8 +6,10 @@ AtCoderのコンテスト問題をセットアップ・テストするためのC
 
 ## 機能
 
+- **`init`** — ワークスペースの初期化（`Cargo.toml`, `rust-toolchain.toml`, `template.rs` を生成）
 - **`new`** — コンテストのセットアップ（Cargoワークスペースへの追加、テストケース取得、テンプレートからソースファイル生成）
 - **`test`** — 保存済みテストケースで解答コードをビルド＆検証
+- **`open`** — コンテストの問題ページをブラウザで開く
 
 ## 必要環境
 
@@ -17,21 +19,40 @@ AtCoderのコンテスト問題をセットアップ・テストするためのC
 ## インストール
 
 ```bash
-cargo build --release
+cargo install --path .
 ```
 
 ## 使い方
 
-### コンテストのセットアップ
+### ワークスペースの初期化
 
 ```bash
-cargo run -- new <コンテスト名>
+atcoder-rust init [フォルダ名]
 ```
 
 例:
 
 ```bash
-cargo run -- new abc300
+atcoder-rust init my-atcoder
+cd my-atcoder
+```
+
+フォルダ名を省略するとカレントディレクトリで初期化します。以下のファイルが生成されます:
+
+- `Cargo.toml` — ワークスペース設定
+- `rust-toolchain.toml` — Rustツールチェイン指定
+- `template.rs` — 解答テンプレート
+
+### コンテストのセットアップ
+
+```bash
+atcoder-rust new <コンテスト名>
+```
+
+例:
+
+```bash
+atcoder-rust new abc300
 ```
 
 これにより以下が行われます:
@@ -44,25 +65,38 @@ cargo run -- new abc300
 ### テストの実行
 
 ```bash
-cargo run -- test <コンテスト名> <問題名>
+atcoder-rust test <コンテスト名> <問題名>
 ```
 
 例:
 
 ```bash
-cargo run -- test abc300 a
+atcoder-rust test abc300 a
 ```
 
 サンプルケースの入出力と実行結果を比較し、AC / WA を表示します。
+
+### 問題ページを開く
+
+```bash
+atcoder-rust open <コンテスト名> [問題名]
+```
+
+例:
+
+```bash
+atcoder-rust open abc300 a   # 問題ページを開く
+atcoder-rust open abc300     # 問題一覧ページを開く
+```
 
 ## プロジェクト構成
 
 ```text
 ├── Cargo.toml          # ワークスペースルート
+├── rust-toolchain.toml # ツールチェイン指定
 ├── template.rs         # 問題ソースのテンプレート
-├── src/main.rs         # CLIツール本体
 └── <contest_name>/     # new で生成されるコンテストディレクトリ
-    ├── Cargo.toml
+    ├── Cargo.toml      # 問題メタデータ含む
     ├── src/bin/        # 問題ごとのソースファイル
     └── test_cases/     # 問題ごとのテストケースJSON
 ```
