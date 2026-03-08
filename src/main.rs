@@ -95,7 +95,7 @@ async fn cmd_new(contest_name: &str) -> Result<(), Box<dyn std::error::Error>> {
   let bin_dir = format!("{contest_name}/src/bin");
   fs::create_dir_all(&bin_dir)?;
 
-  let client = Client::builder().user_agent("atcoder-rust (https://github.com/Kumasan00/Kumasan00)").build()?;
+  let client = Client::builder().user_agent("atcoder-rust (https://github.com/Kumasan00/atcoder-rust)").build()?;
 
   let tasks_url = format!("https://atcoder.jp/contests/{contest_name}/tasks");
   let response = client.get(tasks_url).send().await?.text().await?;
