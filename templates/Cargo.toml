@@ -75,3 +75,6 @@ tap = "=1.0.1"
 text_io = "=0.1.13"
 thiserror = "=2.0.16"
 varisat = "=0.2.2"
+
+[lints]
+workspace = true
