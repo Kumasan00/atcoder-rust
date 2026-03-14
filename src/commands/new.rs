@@ -15,6 +15,8 @@ struct Problem {
   id: String,
   title: String,
   url: String,
+  time_limit: String,
+  memory_limit: String,
 }
 
 pub fn cmd_new(contest_name: &str) -> Result<()> {
@@ -137,6 +139,12 @@ fn parse_problems_from_tasks_html(html: &str) -> Result<Vec<Problem>> {
     let Some(second_td) = tds.next() else {
       continue;
     };
+    let Some(third_td) = tds.next() else {
+      continue;
+    };
+    let Some(fourth_td) = tds.next() else {
+      continue;
+    };
 
     let Some(problem_anchor) = first_td.select(&a_selector).next() else {
       continue;
@@ -147,10 +155,14 @@ fn parse_problems_from_tasks_html(html: &str) -> Result<Vec<Problem>> {
 
     let problem_id = first_td.text().collect::<String>().trim().to_string().to_lowercase();
     let problem_title = second_td.text().collect::<String>().trim().to_string();
+    let problem_time_limit = third_td.text().collect::<String>().trim().to_string();
+    let problem_memory_limit = fourth_td.text().collect::<String>().trim().to_string();
     problems.push(Problem {
       id: problem_id,
       title: problem_title,
       url: format!("https://atcoder.jp{problem_url}"),
+      time_limit: problem_time_limit,
+      memory_limit: problem_memory_limit,
     });
   }
 
@@ -163,6 +175,8 @@ fn write_contest_cargo_toml(contest_root: &Path, contest_name: &str, problems: &
     let mut entry = toml::value::Table::new();
     entry.insert("title".to_string(), toml::Value::String(problem.title.clone()));
     entry.insert("url".to_string(), toml::Value::String(problem.url.clone()));
+    entry.insert("time_limit".to_string(), toml::Value::String(problem.time_limit.clone()));
+    entry.insert("memory_limit".to_string(), toml::Value::String(problem.memory_limit.clone()));
     problems_meta.insert(problem.id.clone(), toml::Value::Table(entry));
   }
 
