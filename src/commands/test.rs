@@ -4,22 +4,29 @@ use std::{
   process::{Command, Stdio},
 };
 
+use anyhow::{Context, Result};
+
+use super::error::CommandError;
 use super::TestCase;
 
-pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<()> {
   // まずビルドする
   println!("【ビルド中】{contest_name}/{problem_name}");
   let build_status =
     Command::new("cargo").args(["build", "--package", contest_name, "--bin", problem_name]).status()?;
   if !build_status.success() {
-    eprintln!("【ビルド失敗】");
-    std::process::exit(1);
+    return Err(CommandError::BuildFailed {
+      contest: contest_name.to_string(),
+      problem: problem_name.to_string(),
+    }
+    .into());
   }
 
   let json_path = format!("{contest_name}/test_cases/{problem_name}.json");
-  let json_str =
-    fs::read_to_string(&json_path).map_err(|_| format!("テストケースファイルが見つかりません: {json_path}"))?;
-  let test_cases: Vec<TestCase> = serde_json::from_str(&json_str)?;
+  let json_str = fs::read_to_string(&json_path)
+    .with_context(|| format!("テストケースファイルが見つかりません: {json_path}"))?;
+  let test_cases: Vec<TestCase> =
+    serde_json::from_str(&json_str).with_context(|| format!("JSON の解析に失敗しました: {json_path}"))?;
 
   if test_cases.is_empty() {
     println!("テストケースがありません。");
@@ -33,7 +40,11 @@ pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<(), Box<dyn st
   for tc in &test_cases {
     let mut child = Command::new(&binary).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
 
-    child.stdin.as_mut().unwrap().write_all(tc.input.as_bytes())?;
+    child
+      .stdin
+      .as_mut()
+      .context("子プロセスの stdin を取得できませんでした")?
+      .write_all(tc.input.as_bytes())?;
 
     let output = child.wait_with_output()?;
     let actual = String::from_utf8_lossy(&output.stdout);
@@ -52,7 +63,7 @@ pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<(), Box<dyn st
 
   println!("\n結果: {passed}/{total} 通過");
   if passed < total {
-    std::process::exit(1);
+    return Err(CommandError::TestFailed { passed, total }.into());
   }
 
   Ok(())

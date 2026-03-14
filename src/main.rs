@@ -1,5 +1,6 @@
 mod commands;
 
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -37,8 +38,7 @@ enum Commands {
   },
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
   let args = Args::parse();
 
   match args.command {
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       commands::init::cmd_init(dir_name.as_deref())?;
     },
     Commands::New { contest_name } => {
-      commands::new::cmd_new(&contest_name).await?;
+      commands::new::cmd_new(&contest_name)?;
     },
     Commands::Test {
       contest_name,
