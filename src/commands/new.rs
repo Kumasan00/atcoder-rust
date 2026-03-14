@@ -8,7 +8,7 @@ use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
 use scraper::{Html, Selector};
 
-use super::{TestCase, error::CommandError};
+use super::{TestCase, build_client, error::CommandError};
 
 #[derive(Debug, Clone)]
 struct Problem {
@@ -29,7 +29,7 @@ pub fn cmd_new(contest_name: &str) -> Result<()> {
   let contest_root = PathBuf::from(contest_name);
   create_contest_layout(&contest_root)?;
 
-  let client = build_http_client()?;
+  let client = build_client()?;
   let (contest_title, problems) = fetch_contest_problems(&client, contest_name)?;
   if problems.is_empty() {
     return Err(CommandError::NoProblemsFetched.into());
@@ -101,13 +101,6 @@ fn create_contest_layout(contest_root: &Path) -> Result<()> {
   fs::create_dir_all(contest_root.join("test_cases"))
     .with_context(|| format!("{} の作成に失敗しました", contest_root.join("test_cases").display()))?;
   Ok(())
-}
-
-fn build_http_client() -> Result<Client> {
-  Client::builder()
-    .user_agent("atcoder-rust (https://github.com/Kumasan00/atcoder-rust)")
-    .build()
-    .context("HTTP クライアントの初期化に失敗しました")
 }
 
 fn fetch_contest_problems(client: &Client, contest_name: &str) -> Result<(String, Vec<Problem>)> {

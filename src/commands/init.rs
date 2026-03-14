@@ -18,9 +18,6 @@ pub fn cmd_init(dir_name: Option<&str>) -> Result<()> {
   };
 
   let cargo_toml_path = "Cargo.toml";
-  let rust_toolchain_path = "rust-toolchain.toml";
-  let template_path = "template.rs";
-
   if Path::new(cargo_toml_path).exists() {
     let display = base_dir.join(cargo_toml_path);
     bail!("{} はすでに存在しています。", display.display());
@@ -30,14 +27,17 @@ pub fn cmd_init(dir_name: Option<&str>) -> Result<()> {
   fs::write(cargo_toml_path, cargo_toml_content).context("Cargo.toml の書き込みに失敗しました")?;
   println!("【作成】{cargo_toml_path}");
 
+  let rustfmt_path = "rustfmt.toml";
   let rustfmt_content = include_str!("../../templates/rustfmt.toml");
-  fs::write("rustfmt.toml", rustfmt_content).context("rustfmt.toml の書き込みに失敗しました")?;
-  println!("【作成】rustfmt.toml");
+  fs::write(rustfmt_path, rustfmt_content).context("rustfmt.toml の書き込みに失敗しました")?;
+  println!("【作成】{rustfmt_path}");
 
+  let rust_toolchain_path = "rust-toolchain.toml";
   let rust_toolchain_content = include_str!("../../templates/rust-toolchain.toml");
   fs::write(rust_toolchain_path, rust_toolchain_content).context("rust-toolchain.toml の書き込みに失敗しました")?;
   println!("【作成】{rust_toolchain_path}");
 
+  let template_path = "template.rs";
   let template_content = include_str!("../../templates/template.rs");
   fs::write(template_path, template_content).context("template.rs の書き込みに失敗しました")?;
   println!("【作成】{template_path}");
