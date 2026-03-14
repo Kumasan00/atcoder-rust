@@ -6,25 +6,25 @@ use std::{
 
 use anyhow::{Context, Result};
 
-use super::error::CommandError;
-use super::TestCase;
+use super::{TestCase, error::CommandError};
 
 pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<()> {
-  // まずビルドする
   println!("【ビルド中】{contest_name}/{problem_name}");
   let build_status =
     Command::new("cargo").args(["build", "--package", contest_name, "--bin", problem_name]).status()?;
   if !build_status.success() {
-    return Err(CommandError::BuildFailed {
-      contest: contest_name.to_string(),
-      problem: problem_name.to_string(),
-    }
-    .into());
+    return Err(
+      CommandError::BuildFailed {
+        contest: contest_name.to_string(),
+        problem: problem_name.to_string(),
+      }
+      .into(),
+    );
   }
 
   let json_path = format!("{contest_name}/test_cases/{problem_name}.json");
-  let json_str = fs::read_to_string(&json_path)
-    .with_context(|| format!("テストケースファイルが見つかりません: {json_path}"))?;
+  let json_str =
+    fs::read_to_string(&json_path).with_context(|| format!("テストケースファイルが見つかりません: {json_path}"))?;
   let test_cases: Vec<TestCase> =
     serde_json::from_str(&json_str).with_context(|| format!("JSON の解析に失敗しました: {json_path}"))?;
 

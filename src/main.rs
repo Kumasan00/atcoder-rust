@@ -14,7 +14,7 @@ struct Args {
 enum Commands {
   /// `AtCoder`用ワークスペースを初期化する (`Cargo.toml`, `rust-toolchain.toml`, `template.rs` を生成)
   Init {
-    /// フォルダ名. 省略時はカレントディレクトリで初期化
+    /// フォルダ名。省略時はカレントディレクトリで初期化
     dir_name: Option<String>,
   },
   /// コンテストのセットアップ (ディレクトリ作成・テストケース取得)
@@ -29,11 +29,18 @@ enum Commands {
     /// 問題名 (例: `a`, `b`, `abc123_a`)
     problem_name: String,
   },
+  /// 問題ページへ提出する
+  Submit {
+    /// コンテスト名 (例: `abs`, `abc123`)
+    contest_name: String,
+    /// 問題名 (例: `a`, `b`, `abc123_a`)
+    problem_name: String,
+  },
   /// コンテストの問題ページをブラウザで開く
   Open {
     /// コンテスト名 (例: `abs`, `abc123`)
     contest_name: String,
-    /// 問題名 (例: `a`, `b`). 省略時は問題一覧ページを開く
+    /// 問題名 (例: `a`, `b`)。省略時は問題一覧ページを開く
     problem_name: Option<String>,
   },
 }
@@ -53,6 +60,12 @@ fn main() -> Result<()> {
       problem_name,
     } => {
       commands::test::cmd_test(&contest_name, &problem_name)?;
+    },
+    Commands::Submit {
+      contest_name,
+      problem_name,
+    } => {
+      commands::submit::cmd_submit(&contest_name, &problem_name)?;
     },
     Commands::Open {
       contest_name,

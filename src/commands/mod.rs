@@ -5,6 +5,7 @@ pub mod error;
 pub mod init;
 pub mod new;
 pub mod open;
+pub mod submit;
 pub mod test;
 
 #[derive(Debug, Serialize, Deserialize)]
