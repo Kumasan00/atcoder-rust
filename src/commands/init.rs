@@ -30,6 +30,10 @@ pub fn cmd_init(dir_name: Option<&str>) -> Result<()> {
   fs::write(cargo_toml_path, cargo_toml_content).context("Cargo.toml の書き込みに失敗しました")?;
   println!("【作成】{cargo_toml_path}");
 
+  let rustfmt_content = include_str!("../../templates/rustfmt.toml");
+  fs::write("rustfmt.toml", rustfmt_content).context("rustfmt.toml の書き込みに失敗しました")?;
+  println!("【作成】rustfmt.toml");
+
   let rust_toolchain_content = include_str!("../../templates/rust-toolchain.toml");
   fs::write(rust_toolchain_path, rust_toolchain_content).context("rust-toolchain.toml の書き込みに失敗しました")?;
   println!("【作成】{rust_toolchain_path}");

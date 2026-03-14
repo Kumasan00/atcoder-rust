@@ -30,12 +30,12 @@ pub fn cmd_new(contest_name: &str) -> Result<()> {
   create_contest_layout(&contest_root)?;
 
   let client = build_http_client()?;
-  let problems = fetch_contest_problems(&client, contest_name)?;
+  let (contest_title, problems) = fetch_contest_problems(&client, contest_name)?;
   if problems.is_empty() {
     return Err(CommandError::NoProblemsFetched.into());
   }
 
-  write_contest_cargo_toml(&contest_root, contest_name, &problems)?;
+  write_contest_cargo_toml(&contest_root, contest_name, &contest_title, &problems)?;
   write_problem_sources(&contest_root, &problems, &template_content)?;
   fetch_and_write_test_cases(&client, &contest_root, &problems)?;
   add_workspace_member(workspace_cargo_toml_path, contest_name)?;
@@ -110,7 +110,7 @@ fn build_http_client() -> Result<Client> {
     .context("HTTP クライアントの初期化に失敗しました")
 }
 
-fn fetch_contest_problems(client: &Client, contest_name: &str) -> Result<Vec<Problem>> {
+fn fetch_contest_problems(client: &Client, contest_name: &str) -> Result<(String, Vec<Problem>)> {
   let tasks_url = format!("https://atcoder.jp/contests/{contest_name}/tasks");
   let response = client
     .get(&tasks_url)
@@ -121,12 +121,20 @@ fn fetch_contest_problems(client: &Client, contest_name: &str) -> Result<Vec<Pro
   parse_problems_from_tasks_html(&response)
 }
 
-fn parse_problems_from_tasks_html(html: &str) -> Result<Vec<Problem>> {
+fn parse_problems_from_tasks_html(html: &str) -> Result<(String, Vec<Problem>)> {
   let document = Html::parse_document(html);
+  let a_contest_title_selector = parse_selector("a.contest-title")?;
   let tbody_selector = parse_selector("#main-container table tbody")?;
   let tr_selector = parse_selector("tr")?;
   let td_selector = parse_selector("td")?;
   let a_selector = parse_selector("a")?;
+
+  let contest_title = document
+    .select(&a_contest_title_selector)
+    .next()
+    .map(|element| element.text().collect::<String>().trim().to_string())
+    .filter(|title| !title.is_empty())
+    .ok_or_else(|| anyhow!("大会名が見つかりません"))?;
 
   let tbody = document.select(&tbody_selector).next().ok_or_else(|| anyhow!("問題一覧テーブルが見つかりません"))?;
 
@@ -166,10 +174,15 @@ fn parse_problems_from_tasks_html(html: &str) -> Result<Vec<Problem>> {
     });
   }
 
-  Ok(problems)
+  Ok((contest_title, problems))
 }
 
-fn write_contest_cargo_toml(contest_root: &Path, contest_name: &str, problems: &[Problem]) -> Result<()> {
+fn write_contest_cargo_toml(
+  contest_root: &Path,
+  contest_name: &str,
+  contest_title: &str,
+  problems: &[Problem],
+) -> Result<()> {
   let mut problems_meta = toml::value::Table::new();
   for problem in problems {
     let mut entry = toml::value::Table::new();
@@ -199,7 +212,7 @@ fn write_contest_cargo_toml(contest_root: &Path, contest_name: &str, problems: &
     .as_table_mut()
     .ok_or(CommandError::InvalidContestCargoToml("atcoder-rust metadata"))?;
   let mut contest_meta = toml::value::Table::new();
-  contest_meta.insert("name".to_string(), toml::Value::String(contest_name.to_string()));
+  contest_meta.insert("name".to_string(), toml::Value::String(contest_title.to_string()));
   contest_meta.insert("url".to_string(), toml::Value::String(format!("https://atcoder.jp/contests/{contest_name}")));
   atcoder_rust.insert("contest".to_string(), toml::Value::Table(contest_meta));
   atcoder_rust.insert("problems".to_string(), toml::Value::Table(problems_meta));
@@ -310,23 +323,29 @@ mod tests {
   #[test]
   fn parse_problems_extracts_id_title_and_url() {
     let html = r#"
+      <a class="contest-title" href="/contests/abc999">AtCoder Beginner Contest 999</a>
       <div id="main-container">
         <table>
           <tbody>
             <tr>
               <td><a href="/contests/abc999/tasks/abc999_a">A</a></td>
               <td>AtCoder Quiz</td>
+              <td>2 sec</td>
+              <td>1024 MiB</td>
             </tr>
             <tr>
               <td><a href="/contests/abc999/tasks/abc999_b">B</a></td>
               <td>Many Oranges</td>
+              <td>2 sec</td>
+              <td>1024 MiB</td>
             </tr>
           </tbody>
         </table>
       </div>
     "#;
 
-    let problems = parse_problems_from_tasks_html(html).expect("failed to parse tasks html");
+    let (contest_title, problems) = parse_problems_from_tasks_html(html).expect("failed to parse tasks html");
+    assert_eq!(contest_title, "AtCoder Beginner Contest 999");
     assert_eq!(problems.len(), 2);
     assert_eq!(problems[0].id, "a");
     assert_eq!(problems[0].title, "AtCoder Quiz");
