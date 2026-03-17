@@ -8,9 +8,6 @@ pub enum CommandError {
   #[error("問題一覧を取得できませんでした")]
   NoProblemsFetched,
 
-  #[error("contest Cargo.toml の {0} が不正です")]
-  InvalidContestCargoToml(&'static str),
-
   #[error("{0} に問題メタデータが見つかりません")]
   MissingProblemsMetadata(String),
 

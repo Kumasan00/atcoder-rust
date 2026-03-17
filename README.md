@@ -6,10 +6,11 @@ AtCoderのコンテスト問題をセットアップ・テストするためのC
 
 ## 機能
 
-- **`init`** — ワークスペースの初期化（`Cargo.toml`, `rust-toolchain.toml`, `template.rs` を生成）
+- **`init`** — ワークスペースの初期化（`Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `template.rs` を生成）
 - **`new`** — コンテストのセットアップ（Cargoワークスペースへの追加、テストケース取得、テンプレートからソースファイル生成）
 - **`test`** — 保存済みテストケースで解答コードをビルド＆検証
 - **`open`** — コンテストの問題ページをブラウザで開く
+- **`submit`** — ソースコードをクリップボードにコピーし、提出ページをブラウザで開く
 
 ## 必要環境
 
@@ -41,6 +42,7 @@ cd my-atcoder
 
 - `Cargo.toml` — ワークスペース設定
 - `rust-toolchain.toml` — Rustツールチェイン指定
+- `rustfmt.toml` — フォーマッタ設定
 - `template.rs` — 解答テンプレート
 
 ### コンテストのセットアップ
@@ -89,11 +91,26 @@ atcoder-rust open abc300 a   # 問題ページを開く
 atcoder-rust open abc300     # 問題一覧ページを開く
 ```
 
+### 解答の提出
+
+```bash
+atcoder-rust submit <コンテスト名> <問題名>
+```
+
+例:
+
+```bash
+atcoder-rust submit abc300 a
+```
+
+ソースコード（`<コンテスト名>/src/bin/<問題名>.rs`）をクリップボードにコピーし、問題の提出ページをブラウザで開きます。ページ上でコードを貼り付けて提出してください。
+
 ## プロジェクト構成
 
 ```text
 ├── Cargo.toml          # ワークスペースルート
 ├── rust-toolchain.toml # ツールチェイン指定
+├── rustfmt.toml        # フォーマッタ設定
 ├── template.rs         # 問題ソースのテンプレート
 └── <contest_name>/     # new で生成されるコンテストディレクトリ
     ├── Cargo.toml      # 問題メタデータ含む

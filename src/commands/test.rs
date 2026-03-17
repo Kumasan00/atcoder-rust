@@ -38,7 +38,8 @@ pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<()> {
   let total = test_cases.len();
 
   for tc in &test_cases {
-    let mut child = Command::new(&binary).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let mut child =
+      Command::new(&binary).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
 
     child
       .stdin
@@ -50,6 +51,8 @@ pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<()> {
     let actual = String::from_utf8_lossy(&output.stdout);
     let actual_trimmed = actual.trim();
     let expected_trimmed = tc.output.trim();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr_trimmed = stderr.trim();
 
     if actual_trimmed == expected_trimmed {
       println!("【AC】{}", tc.name);
@@ -58,6 +61,9 @@ pub fn cmd_test(contest_name: &str, problem_name: &str) -> Result<()> {
       println!("【WA】{}", tc.name);
       println!("  期待: {expected_trimmed:?}");
       println!("  実際: {actual_trimmed:?}");
+    }
+    if !stderr_trimmed.is_empty() {
+      println!("  stderr: {stderr_trimmed}");
     }
   }
 

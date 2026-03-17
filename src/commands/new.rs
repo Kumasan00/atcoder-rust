@@ -1,4 +1,5 @@
 use std::{
+  fmt::Write,
   fs,
   path::{Path, PathBuf},
   time::Duration,
@@ -52,34 +53,11 @@ fn workspace_member_exists(workspace_toml_path: &Path, contest_name: &str) -> Re
   Ok(members.iter().any(|v| v.as_str() == Some(contest_name)))
 }
 
-fn add_workspace_member(workspace_toml_path: &Path, contest_name: &str) -> Result<()> {
-  let workspace_cargo_toml = fs::read_to_string(workspace_toml_path)
-    .with_context(|| format!("{} の読み込みに失敗しました", workspace_toml_path.display()))?;
-  let mut cargo_toml: toml::Value = toml::from_str(&workspace_cargo_toml)
-    .with_context(|| format!("{} の TOML 解析に失敗しました", workspace_toml_path.display()))?;
-  let members = workspace_members_mut(&mut cargo_toml)?;
-  members.push(toml::Value::String(contest_name.to_string()));
-
-  let updated_cargo_toml_string =
-    toml::to_string_pretty(&cargo_toml).context("workspace Cargo.toml の整形に失敗しました")?;
-  fs::write(workspace_toml_path, updated_cargo_toml_string)
-    .with_context(|| format!("{} の書き込みに失敗しました", workspace_toml_path.display()))?;
-  Ok(())
-}
-
 fn workspace_members(cargo_toml: &toml::Value) -> Result<&Vec<toml::Value>> {
   cargo_toml
     .get("workspace")
     .and_then(|ws| ws.get("members"))
     .and_then(toml::Value::as_array)
-    .ok_or_else(|| CommandError::WorkspaceMembersMissing.into())
-}
-
-fn workspace_members_mut(cargo_toml: &mut toml::Value) -> Result<&mut Vec<toml::Value>> {
-  cargo_toml
-    .get_mut("workspace")
-    .and_then(|ws| ws.get_mut("members"))
-    .and_then(toml::Value::as_array_mut)
     .ok_or_else(|| CommandError::WorkspaceMembersMissing.into())
 }
 
@@ -176,47 +154,48 @@ fn write_contest_cargo_toml(
   contest_title: &str,
   problems: &[Problem],
 ) -> Result<()> {
-  let mut problems_meta = toml::value::Table::new();
+  let mut out = String::new();
+
+  // [package]
+  let _ = write!(
+    out,
+    "[package]\nname = {}\nversion = \"0.1.0\"\nedition.workspace = true\n",
+    toml_string(contest_name),
+  );
+
+  // [dependencies]
+  out.push_str("\n[dependencies]\n");
+
+  // [lints]
+  out.push_str("\n[lints]\nworkspace = true\n");
+
+  // [package.metadata.atcoder-rust.contest]
+  let _ = write!(
+    out,
+    "\n[package.metadata.atcoder-rust.contest]\nname = {}\nurl = {}\n",
+    toml_string(contest_title),
+    toml_string(&format!("https://atcoder.jp/contests/{contest_name}")),
+  );
+
+  // [package.metadata.atcoder-rust.problems.<id>]
   for problem in problems {
-    let mut entry = toml::value::Table::new();
-    entry.insert("title".to_string(), toml::Value::String(problem.title.clone()));
-    entry.insert("url".to_string(), toml::Value::String(problem.url.clone()));
-    entry.insert("time_limit".to_string(), toml::Value::String(problem.time_limit.clone()));
-    entry.insert("memory_limit".to_string(), toml::Value::String(problem.memory_limit.clone()));
-    problems_meta.insert(problem.id.clone(), toml::Value::Table(entry));
+    let _ = write!(
+      out,
+      "\n[package.metadata.atcoder-rust.problems.{}]\ntitle = {}\nurl = {}\ntime_limit = {}\nmemory_limit = {}\n",
+      problem.id,
+      toml_string(&problem.title),
+      toml_string(&problem.url),
+      toml_string(&problem.time_limit),
+      toml_string(&problem.memory_limit),
+    );
   }
 
-  let base_cargo_toml = format!(
-    "[package]\nname = \"{contest_name}\"\nversion = \"0.1.0\"\nedition.workspace = true\n\n[dependencies]\n\n[lints]\nworkspace = true\n"
-  );
-  let mut cargo_toml_val: toml::Value = toml::from_str(&base_cargo_toml)?;
-  let package_table = cargo_toml_val
-    .get_mut("package")
-    .and_then(toml::Value::as_table_mut)
-    .ok_or(CommandError::InvalidContestCargoToml("[package]"))?;
-  let metadata = package_table
-    .entry("metadata")
-    .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
-    .as_table_mut()
-    .ok_or(CommandError::InvalidContestCargoToml("metadata"))?;
-  let atcoder_rust = metadata
-    .entry("atcoder-rust")
-    .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
-    .as_table_mut()
-    .ok_or(CommandError::InvalidContestCargoToml("atcoder-rust metadata"))?;
-  let mut contest_meta = toml::value::Table::new();
-  contest_meta.insert("name".to_string(), toml::Value::String(contest_title.to_string()));
-  contest_meta.insert("url".to_string(), toml::Value::String(format!("https://atcoder.jp/contests/{contest_name}")));
-  atcoder_rust.insert("contest".to_string(), toml::Value::Table(contest_meta));
-  atcoder_rust.insert("problems".to_string(), toml::Value::Table(problems_meta));
-
-  fs::write(
-    contest_root.join("Cargo.toml"),
-    toml::to_string_pretty(&cargo_toml_val).context("contest Cargo.toml の整形に失敗しました")?,
-  )
-  .with_context(|| format!("{} の書き込みに失敗しました", contest_root.join("Cargo.toml").display()))?;
+  fs::write(contest_root.join("Cargo.toml"), out)
+    .with_context(|| format!("{} の書き込みに失敗しました", contest_root.join("Cargo.toml").display()))?;
   Ok(())
 }
+
+fn toml_string(value: &str) -> String { toml::Value::String(value.to_string()).to_string() }
 
 fn write_problem_sources(contest_root: &Path, problems: &[Problem], template_content: &str) -> Result<()> {
   for problem in problems {
@@ -308,6 +287,46 @@ fn parse_test_cases_from_problem_html(html: &str) -> Result<Vec<TestCase>> {
 
 fn parse_selector(selector: &str) -> Result<Selector> {
   Selector::parse(selector).map_err(|e| anyhow!("selector parse error ({selector}): {e}"))
+}
+
+fn add_workspace_member(workspace_toml_path: &Path, contest_name: &str) -> Result<()> {
+  let content = fs::read_to_string(workspace_toml_path)
+    .with_context(|| format!("{} の読み込みに失敗しました", workspace_toml_path.display()))?;
+
+  // members = [...] の閉じ ']' を探して直前に挿入する
+  let members_start = content
+    .find("members")
+    .ok_or_else(|| anyhow!("workspace Cargo.toml に members が見つかりません"))?;
+  let bracket_open = content[members_start..]
+    .find('[')
+    .map(|i| members_start + i)
+    .ok_or_else(|| anyhow!("members の '[' が見つかりません"))?;
+  let bracket_close = content[bracket_open..]
+    .find(']')
+    .map(|i| bracket_open + i)
+    .ok_or_else(|| anyhow!("members の ']' が見つかりません"))?;
+
+  let inside = content[bracket_open + 1..bracket_close].trim();
+  let mut members: Vec<&str> = if inside.is_empty() {
+    Vec::new()
+  } else {
+    inside.split(',').map(str::trim).collect()
+  };
+  let new_entry = toml_string(contest_name);
+  members.push(&new_entry);
+  members.sort_unstable();
+  let new_member_list = format!("[{}]", members.join(", "));
+
+  let updated = format!(
+    "{}{}{}",
+    &content[..bracket_open],
+    new_member_list,
+    &content[bracket_close + 1..],
+  );
+
+  fs::write(workspace_toml_path, updated)
+    .with_context(|| format!("{} の書き込みに失敗しました", workspace_toml_path.display()))?;
+  Ok(())
 }
 
 #[cfg(test)]
