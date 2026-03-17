@@ -1,4 +1,4 @@
-use std::{fs, process::Command};
+use std::fs;
 
 use anyhow::{Context, Result};
 
@@ -34,7 +34,7 @@ pub fn cmd_open(contest_name: &str, problem_name: Option<&str>) -> Result<()> {
   };
 
   println!("【オープン】{url}");
-  Command::new("open").arg(&url).status().with_context(|| format!("URL を開けませんでした: {url}"))?;
+  open::that(&url)?;
 
   Ok(())
 }

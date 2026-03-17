@@ -221,8 +221,9 @@ fn write_contest_cargo_toml(
 fn write_problem_sources(contest_root: &Path, problems: &[Problem], template_content: &str) -> Result<()> {
   for problem in problems {
     let source_path = contest_root.join("src/bin").join(format!("{}.rs", problem.id));
-    fs::write(&source_path, template_content)
-      .with_context(|| format!("{} の書き込みに失敗しました", source_path.display()))?;
+    let header = format!("// 問題: {}\n// URL: {}\n\n", problem.title, problem.url);
+    let content = format!("{header}{template_content}");
+    fs::write(&source_path, content).with_context(|| format!("{} の書き込みに失敗しました", source_path.display()))?;
   }
   Ok(())
 }
