@@ -292,46 +292,49 @@ fn parse_selector(selector: &str) -> Result<Selector> {
 fn add_workspace_member(workspace_toml_path: &Path, contest_name: &str) -> Result<()> {
   let content = fs::read_to_string(workspace_toml_path)
     .with_context(|| format!("{} の読み込みに失敗しました", workspace_toml_path.display()))?;
-
-  // members = [...] の閉じ ']' を探して直前に挿入する
-  let members_start = content
-    .find("members")
-    .ok_or_else(|| anyhow!("workspace Cargo.toml に members が見つかりません"))?;
-  let bracket_open = content[members_start..]
-    .find('[')
-    .map(|i| members_start + i)
-    .ok_or_else(|| anyhow!("members の '[' が見つかりません"))?;
-  let bracket_close = content[bracket_open..]
-    .find(']')
-    .map(|i| bracket_open + i)
-    .ok_or_else(|| anyhow!("members の ']' が見つかりません"))?;
-
-  let inside = content[bracket_open + 1..bracket_close].trim();
-  let mut members: Vec<&str> = if inside.is_empty() {
-    Vec::new()
-  } else {
-    inside.split(',').map(str::trim).collect()
-  };
-  let new_entry = toml_string(contest_name);
-  members.push(&new_entry);
-  members.sort_unstable();
-  let new_member_list = format!("[{}]", members.join(", "));
-
-  let updated = format!(
-    "{}{}{}",
-    &content[..bracket_open],
-    new_member_list,
-    &content[bracket_close + 1..],
-  );
+  let updated = update_workspace_members_toml(&content, contest_name)?;
 
   fs::write(workspace_toml_path, updated)
     .with_context(|| format!("{} の書き込みに失敗しました", workspace_toml_path.display()))?;
   Ok(())
 }
 
+fn update_workspace_members_toml(content: &str, contest_name: &str) -> Result<String> {
+  let mut cargo_toml: toml::Value =
+    toml::from_str(content).context("workspace Cargo.toml の TOML 解析に失敗しました")?;
+
+  let root = cargo_toml
+    .as_table_mut()
+    .ok_or_else(|| anyhow!("workspace Cargo.toml のルートがテーブルではありません"))?;
+  let workspace = root.entry("workspace").or_insert_with(|| toml::Value::Table(toml::Table::new()));
+  let workspace_table = workspace
+    .as_table_mut()
+    .ok_or_else(|| anyhow!("workspace Cargo.toml の workspace がテーブルではありません"))?;
+  let members = workspace_table
+    .entry("members")
+    .or_insert_with(|| toml::Value::Array(Vec::new()))
+    .as_array_mut()
+    .ok_or_else(|| anyhow!("workspace Cargo.toml の workspace.members が配列ではありません"))?;
+
+  if members.iter().any(|v| v.as_str().is_none()) {
+    return Err(anyhow!("workspace.members に文字列以外の値が含まれています"));
+  }
+
+  if !members.iter().any(|v| v.as_str() == Some(contest_name)) {
+    members.push(toml::Value::String(contest_name.to_string()));
+  }
+
+  members.sort_by(|a, b| a.as_str().unwrap_or_default().cmp(b.as_str().unwrap_or_default()));
+
+  toml::to_string_pretty(&cargo_toml).context("workspace Cargo.toml の TOML 文字列化に失敗しました")
+}
+
 #[cfg(test)]
 mod tests {
-  use super::{parse_problems_from_tasks_html, parse_test_cases_from_problem_html};
+  use super::{
+    parse_problems_from_tasks_html, parse_test_cases_from_problem_html, update_workspace_members_toml,
+    workspace_members,
+  };
 
   #[test]
   fn parse_problems_extracts_id_title_and_url() {
@@ -391,5 +394,52 @@ mod tests {
     assert_eq!(test_cases[0].name, "入力例 1");
     assert_eq!(test_cases[0].input, "1 2\\n");
     assert_eq!(test_cases[0].output, "3\\n");
+  }
+
+  #[test]
+  fn update_workspace_members_keeps_valid_toml() {
+    let before = r#"
+      [workspace]
+      members = ["abc100", "abc001"]
+      resolver = "3"
+    "#;
+
+    let after = update_workspace_members_toml(before, "abc042").expect("failed to update members");
+    let value: toml::Value = toml::from_str(&after).expect("updated content must be valid TOML");
+    let members = workspace_members(&value).expect("workspace.members must exist");
+    let members: Vec<&str> = members.iter().filter_map(toml::Value::as_str).collect();
+
+    assert_eq!(members, vec!["abc001", "abc042", "abc100"]);
+  }
+
+  #[test]
+  fn update_workspace_members_creates_workspace_and_members_if_missing() {
+    let before = r#"
+      [package]
+      name = "sample"
+      version = "0.1.0"
+    "#;
+
+    let after = update_workspace_members_toml(before, "abc123").expect("failed to update members");
+    let value: toml::Value = toml::from_str(&after).expect("updated content must be valid TOML");
+    let members = workspace_members(&value).expect("workspace.members must exist");
+    let members: Vec<&str> = members.iter().filter_map(toml::Value::as_str).collect();
+
+    assert_eq!(members, vec!["abc123"]);
+  }
+
+  #[test]
+  fn update_workspace_members_creates_members_if_workspace_exists_without_members() {
+    let before = r#"
+      [workspace]
+      resolver = "3"
+    "#;
+
+    let after = update_workspace_members_toml(before, "abc777").expect("failed to update members");
+    let value: toml::Value = toml::from_str(&after).expect("updated content must be valid TOML");
+    let members = workspace_members(&value).expect("workspace.members must exist");
+    let members: Vec<&str> = members.iter().filter_map(toml::Value::as_str).collect();
+
+    assert_eq!(members, vec!["abc777"]);
   }
 }
